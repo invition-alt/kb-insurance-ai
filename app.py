@@ -556,3 +556,83 @@ if st.button("보험금 계산하기", use_container_width=True):
         "가입증권, 특약 가입 여부, 보상 제외 사유, 누적 지급액, "
         "치료 인정 기준 및 보험사 심사에 따라 달라질 수 있습니다."
     )
+
+
+    st.divider()
+    st.subheader("약관 근거 및 적용 페이지")
+
+    st.caption(
+        "아래 페이지는 업로드된 약관 PDF 뷰어 기준입니다. "
+        "실제 계약의 가입증권·특약 및 개정 약관에 따라 달라질 수 있습니다."
+    )
+
+    if medical_cost > 0:
+        with st.expander("급여 의료비 근거", expanded=True):
+            st.write(
+                "- 근거: 보통약관 제3조(보험금의 지급사유) 및 제5조(보험금의 지급한도)"
+            )
+            if treatment_type == "통원":
+                st.write(
+                    "- 적용 내용: 급여 통원 의료비에서 의료기관 유형별 최소 공제금액과 "
+                    "보장대상 의료비의 20% 중 큰 금액을 공제한 뒤, 1회 한도와 연간 잔여한도를 적용"
+                )
+            else:
+                st.write(
+                    "- 적용 내용: 급여 입원 의료비의 80%를 기본 보상하고, "
+                    "연간 급여 본인부담금 200만원 초과분 관련 기준을 반영"
+                )
+            st.write("- PDF 위치: 11~12쪽(급여 보상 기준), 17쪽(급여 연간 한도)")
+
+    if non_covered_cost > 0 or (treatment_type == "입원" and room_cost > 0):
+        with st.expander("일반 비급여 의료비 근거", expanded=True):
+            st.write(
+                "- 근거: 보통약관의 비급여 보상 관련 조항 및 지급한도 조항"
+            )
+            if treatment_type == "통원":
+                st.write(
+                    "- 적용 내용: 3만원과 보장대상 의료비의 30% 중 큰 금액을 공제하고, "
+                    "통원 1회 한도·연간 잔여한도·연 100회 제한을 적용"
+                )
+            else:
+                st.write(
+                    "- 적용 내용: 일반 비급여 입원 의료비의 70% 및 상급병실료 차액의 "
+                    "50%(1일 평균 10만원 한도)를 기준으로 계산"
+                )
+            st.write("- PDF 위치: 39~40쪽")
+
+    if therapy_cost > 0:
+        with st.expander("도수치료·체외충격파·증식치료 근거", expanded=True):
+            st.write(
+                "- 근거: 3대 비급여 특별약관의 도수치료·체외충격파·증식치료 보상 규정"
+            )
+            st.write(
+                "- 적용 내용: 1회당 3만원과 보장대상 의료비의 30% 중 큰 금액 공제, "
+                "연간 350만원 및 합산 50회 한도"
+            )
+            st.write(
+                "- 추가 조건: 최초 10회 이후에는 증상 개선 또는 병변 호전 확인 등 "
+                "약관상 요건에 따라 추가 보상 여부 판단"
+            )
+            st.write("- PDF 위치: 43~44쪽")
+
+    if injection_cost > 0:
+        with st.expander("비급여 주사료 근거", expanded=True):
+            st.write(
+                "- 근거: 3대 비급여 특별약관의 비급여 주사료 보상 규정"
+            )
+            st.write(
+                "- 적용 내용: 1회당 3만원과 보장대상 의료비의 30% 중 큰 금액 공제, "
+                "연간 250만원 및 50회 한도"
+            )
+            st.write("- PDF 위치: 43~44쪽")
+
+    if mri_cost > 0:
+        with st.expander("MRI·MRA 근거", expanded=True):
+            st.write(
+                "- 근거: 3대 비급여 특별약관의 MRI·MRA 보상 규정"
+            )
+            st.write(
+                "- 적용 내용: 1회당 3만원과 보장대상 의료비의 30% 중 큰 금액 공제, "
+                "연간 300만원 한도"
+            )
+            st.write("- PDF 위치: 43~44쪽")
