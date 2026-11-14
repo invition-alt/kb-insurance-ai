@@ -1,5 +1,4 @@
 
-
 import streamlit as st
 
 st.set_page_config(
@@ -8,11 +7,39 @@ st.set_page_config(
     layout="centered"
 )
 
+
+def calculate_special(cost, visits, previous_paid, annual_limit,
+                      previous_visits, visit_limit=None):
+    """3대 비급여 1회당 공제 및 연간 한도 계산"""
+    deductible = max(30000, int(cost * 0.30))
+    benefit_per_visit = max(0, cost - deductible)
+
+    remaining_money = max(0, annual_limit - previous_paid)
+
+    if visit_limit is None:
+        allowed_visits = visits
+    else:
+        remaining_visits = max(0, visit_limit - previous_visits)
+        allowed_visits = min(visits, remaining_visits)
+
+    calculated = benefit_per_visit * allowed_visits
+    benefit = min(calculated, remaining_money)
+
+    return {
+        "deductible": deductible,
+        "per_visit": benefit_per_visit,
+        "allowed_visits": allowed_visits,
+        "calculated": calculated,
+        "remaining_money": remaining_money,
+        "benefit": benefit
+    }
+
+
 st.title("🏥 KB 4세대 실손보험 계산기")
-st.caption("급여·비급여 통합 예상 보험금 계산")
+st.caption("급여·비급여·3대 비급여 통합 예상 보험금 계산")
 
 st.info(
-    "포트폴리오용 MVP입니다. 실제 지급액은 가입증권, "
+    "포트폴리오용 MVP입니다. 실제 보험금은 가입증권, "
     "특약, 누적 지급액 및 보험사 심사에 따라 달라질 수 있습니다."
 )
 
@@ -31,7 +58,7 @@ treatment_type = st.radio(
 )
 
 st.divider()
-st.header("2. 의료비 입력")
+st.header("2. 일반 의료비 입력")
 
 st.subheader("급여 의료비")
 
@@ -42,7 +69,7 @@ medical_cost = st.number_input(
     step=10000
 )
 
-st.subheader("비급여 의료비")
+st.subheader("일반 비급여 의료비")
 
 non_covered_cost = st.number_input(
     "일반 비급여 보장대상 의료비 (원)",
@@ -52,8 +79,8 @@ non_covered_cost = st.number_input(
 )
 
 st.caption(
-    "일반 비급여 입력에는 도수치료·체외충격파·증식치료, "
-    "비급여 주사료, MRI/MRA 등 3대 비급여 특약 항목을 포함하지 마세요."
+    "일반 비급여에는 도수치료·체외충격파·증식치료, "
+    "비급여 주사료, MRI/MRA 비용을 포함하지 마세요."
 )
 
 if treatment_type == "통원":
@@ -86,7 +113,7 @@ if treatment_type == "통원":
     )
 
     previous_visits = st.number_input(
-        "해당 보험연도 이전까지 사용한 비급여 통원 횟수",
+        "기존 비급여 통원 사용 횟수",
         min_value=0,
         value=0,
         step=1
@@ -128,7 +155,7 @@ else:
     )
 
     previous_copay = st.number_input(
-        "해당 보험연도 이전까지 누적된 급여 입원 본인부담금 20% (원)",
+        "기존 급여 입원 본인부담금 20% 누적액 (원)",
         min_value=0,
         value=0,
         step=10000
@@ -150,8 +177,128 @@ else:
         step=100000
     )
 
+
 st.divider()
-st.header("4. 예상 보험금 계산")
+st.header("4. 3대 비급여 특약 입력")
+
+st.caption(
+    "각 항목의 1회 의료비와 이번 치료 횟수를 입력하세요. "
+    "이전까지 지급받은 보험금과 사용 횟수도 입력해야 잔여 한도를 계산할 수 있습니다."
+)
+
+# 도수치료 등
+st.subheader("① 도수치료·체외충격파·증식치료")
+
+therapy_cost = st.number_input(
+    "해당 치료 1회당 비급여 의료비 (원)",
+    min_value=0,
+    value=0,
+    step=10000,
+    key="therapy_cost"
+)
+
+therapy_visits = st.number_input(
+    "이번 치료 횟수",
+    min_value=0,
+    value=0,
+    step=1,
+    key="therapy_visits"
+)
+
+therapy_previous_paid = st.number_input(
+    "기존 연간 지급 보험금 (원)",
+    min_value=0,
+    value=0,
+    step=10000,
+    key="therapy_paid"
+)
+
+therapy_previous_visits = st.number_input(
+    "기존 연간 치료 횟수",
+    min_value=0,
+    value=0,
+    step=1,
+    key="therapy_previous"
+)
+
+therapy_improved = st.checkbox(
+    "최초 10회 이후 추가 치료에 대해 증상 개선·병변 호전이 확인됨",
+    value=False
+)
+
+st.divider()
+
+# 비급여 주사료
+st.subheader("② 비급여 주사료")
+
+injection_cost = st.number_input(
+    "주사치료 1회당 비급여 의료비 (원)",
+    min_value=0,
+    value=0,
+    step=10000,
+    key="injection_cost"
+)
+
+injection_visits = st.number_input(
+    "이번 주사치료 횟수",
+    min_value=0,
+    value=0,
+    step=1,
+    key="injection_visits"
+)
+
+injection_previous_paid = st.number_input(
+    "기존 연간 지급 보험금 (원)",
+    min_value=0,
+    value=0,
+    step=10000,
+    key="injection_paid"
+)
+
+injection_previous_visits = st.number_input(
+    "기존 연간 주사치료 횟수",
+    min_value=0,
+    value=0,
+    step=1,
+    key="injection_previous"
+)
+
+st.caption(
+    "항암제·항생제·희귀의약품을 위한 비급여 주사료는 "
+    "이 특약이 아닌 일반 비급여 보상 대상일 수 있습니다."
+)
+
+st.divider()
+
+# MRI/MRA
+st.subheader("③ MRI·MRA")
+
+mri_cost = st.number_input(
+    "MRI·MRA 1회당 비급여 의료비 (원)",
+    min_value=0,
+    value=0,
+    step=10000,
+    key="mri_cost"
+)
+
+mri_visits = st.number_input(
+    "이번 MRI·MRA 검사 횟수",
+    min_value=0,
+    value=0,
+    step=1,
+    key="mri_visits"
+)
+
+mri_previous_paid = st.number_input(
+    "기존 연간 지급 보험금 (원)",
+    min_value=0,
+    value=0,
+    step=10000,
+    key="mri_paid"
+)
+
+st.divider()
+st.header("5. 예상 보험금 계산")
 
 if st.button("보험금 계산하기", use_container_width=True):
 
@@ -159,9 +306,9 @@ if st.button("보험금 계산하기", use_container_width=True):
     비급여보험금 = 0
     details = []
 
+    # 일반 급여·비급여 계산
     if treatment_type == "통원":
 
-        # 급여 통원
         최소공제 = (
             10000
             if hospital_type == "의원급 의료기관·보건소 등"
@@ -184,7 +331,6 @@ if st.button("보험금 계산하기", use_container_width=True):
             급여잔여한도
         )
 
-        # 일반 비급여 통원
         비급여공제 = max(
             30000,
             int(non_covered_cost * 0.30)
@@ -201,85 +347,132 @@ if st.button("보험금 계산하기", use_container_width=True):
             else 0
         )
 
-        details = [
+        details.extend([
             f"급여 의료비: {medical_cost:,}원",
             f"급여 공제금액: {급여공제:,}원",
-            f"급여 한도 적용 전 금액: {급여계산액:,}원",
-            f"급여 통원 보상한도: {급여한도:,}원",
-            f"비급여 의료비: {non_covered_cost:,}원",
-            f"비급여 공제금액: {비급여공제:,}원",
-            f"비급여 한도 적용 전 금액: {비급여계산액:,}원",
-            f"기존 비급여 통원 사용 횟수: {previous_visits}회"
-        ]
+            f"급여 보상액: {급여보험금:,}원",
+            f"일반 비급여 의료비: {non_covered_cost:,}원",
+            f"일반 비급여 공제금액: {비급여공제:,}원",
+            f"일반 비급여 보상액: {비급여보험금:,}원"
+        ])
 
     else:
 
-        # 급여 입원
         기본급여보험금 = int(medical_cost * 0.80)
         현재본인부담금 = medical_cost * 0.20
 
-        연간초과전 = max(
-            0,
-            previous_copay - 2000000
-        )
-
+        연간초과전 = max(0, previous_copay - 2000000)
         연간초과후 = max(
             0,
             previous_copay + 현재본인부담금 - 2000000
         )
 
-        추가급여보험금 = int(
-            연간초과후 - 연간초과전
-        )
+        추가급여보험금 = int(연간초과후 - 연간초과전)
 
-        급여계산액 = (
-            기본급여보험금 + 추가급여보험금
-        )
+        급여계산액 = 기본급여보험금 + 추가급여보험금
 
         급여보험금 = min(
             급여계산액,
             급여잔여한도
         )
 
-        # 일반 비급여 입원
-        일반비급여보험금 = int(
-            non_covered_cost * 0.70
-        )
+        일반비급여보험금 = int(non_covered_cost * 0.70)
 
         일평균병실료 = room_cost / hospital_days
-
-        보상대상병실료 = (
-            min(일평균병실료, 100000) * hospital_days
-        )
+        보상대상병실료 = min(
+            일평균병실료,
+            100000
+        ) * hospital_days
 
         병실료보험금 = int(
             보상대상병실료 * 0.50
         )
 
-        비급여계산액 = (
-            일반비급여보험금 + 병실료보험금
-        )
+        비급여계산액 = 일반비급여보험금 + 병실료보험금
 
         비급여보험금 = min(
             비급여계산액,
             비급여잔여한도
         )
 
-        details = [
+        details.extend([
             f"급여 의료비: {medical_cost:,}원",
-            f"급여 기본 보상액 (80%): {기본급여보험금:,}원",
+            f"급여 기본 보상액: {기본급여보험금:,}원",
             f"급여 추가 보상액: {추가급여보험금:,}원",
-            f"급여 한도 적용 전 금액: {급여계산액:,}원",
+            f"급여 예상 보험금: {급여보험금:,}원",
             f"일반 비급여 의료비: {non_covered_cost:,}원",
-            f"일반 비급여 보상액 (70%): {일반비급여보험금:,}원",
-            f"상급병실료 차액: {room_cost:,}원",
-            f"1일 평균 상급병실료: {일평균병실료:,.0f}원",
-            f"상급병실료 보상액 (50%): {병실료보험금:,}원",
-            f"비급여 한도 적용 전 금액: {비급여계산액:,}원"
-        ]
+            f"일반 비급여 보상액: {일반비급여보험금:,}원",
+            f"상급병실료 보상액: {병실료보험금:,}원",
+            f"일반 비급여 예상 보험금: {비급여보험금:,}원"
+        ])
 
-    total_benefit = 급여보험금 + 비급여보험금
+    # 3대 비급여 계산
+    therapy_allowed = min(
+        therapy_visits,
+        max(0, 50 - therapy_previous_visits)
+    )
 
+    initial_remaining = max(
+        0,
+        10 - therapy_previous_visits
+    )
+
+    initial_current = min(
+        therapy_allowed,
+        initial_remaining
+    )
+
+    additional_current = therapy_allowed - initial_current
+
+    if therapy_improved:
+        therapy_eligible = initial_current + additional_current
+    else:
+        therapy_eligible = initial_current
+
+    therapy_result = calculate_special(
+        therapy_cost,
+        therapy_eligible,
+        therapy_previous_paid,
+        3500000,
+        therapy_previous_visits,
+        50
+    )
+
+    injection_result = calculate_special(
+        injection_cost,
+        injection_visits,
+        injection_previous_paid,
+        2500000,
+        injection_previous_visits,
+        50
+    )
+
+    mri_result = calculate_special(
+        mri_cost,
+        mri_visits,
+        mri_previous_paid,
+        3000000,
+        0,
+        None
+    )
+
+    therapy_benefit = therapy_result["benefit"]
+    injection_benefit = injection_result["benefit"]
+    mri_benefit = mri_result["benefit"]
+
+    special_total = (
+        therapy_benefit
+        + injection_benefit
+        + mri_benefit
+    )
+
+    total_benefit = (
+        급여보험금
+        + 비급여보험금
+        + special_total
+    )
+
+    # 결과 출력
     st.success("계산이 완료되었습니다.")
 
     st.subheader("예상 보험금")
@@ -299,12 +492,39 @@ if st.button("보험금 계산하기", use_container_width=True):
 
     with col2:
         st.metric(
-            "비급여 예상 보험금",
+            "일반 비급여 예상 보험금",
             f"{비급여보험금:,}원"
         )
 
+    st.metric(
+        "3대 비급여 예상 보험금",
+        f"{special_total:,}원"
+    )
+
     st.divider()
-    st.subheader("계산 상세 내역")
+    st.subheader("3대 비급여 계산 상세")
+
+    st.write("**① 도수치료·체외충격파·증식치료**")
+    st.write(f"- 1회당 의료비: {therapy_cost:,}원")
+    st.write(f"- 1회당 공제금액: {therapy_result['deductible']:,}원")
+    st.write(f"- 보상 가능한 이번 치료 횟수: {therapy_eligible}회")
+    st.write(f"- 기존 사용 횟수: {therapy_previous_visits}회")
+    st.write(f"- 예상 보험금: {therapy_benefit:,}원")
+
+    st.write("**② 비급여 주사료**")
+    st.write(f"- 1회당 의료비: {injection_cost:,}원")
+    st.write(f"- 1회당 공제금액: {injection_result['deductible']:,}원")
+    st.write(f"- 보상 적용 횟수: {injection_result['allowed_visits']}회")
+    st.write(f"- 예상 보험금: {injection_benefit:,}원")
+
+    st.write("**③ MRI·MRA**")
+    st.write(f"- 1회당 의료비: {mri_cost:,}원")
+    st.write(f"- 1회당 공제금액: {mri_result['deductible']:,}원")
+    st.write(f"- 검사 횟수: {mri_visits}회")
+    st.write(f"- 예상 보험금: {mri_benefit:,}원")
+
+    st.divider()
+    st.subheader("전체 계산 내역")
 
     for item in details:
         st.write(f"- {item}")
@@ -312,28 +532,27 @@ if st.button("보험금 계산하기", use_container_width=True):
     st.divider()
     st.subheader("적용 기준")
 
-    if treatment_type == "통원":
-        st.write(
-            "급여 통원: 의료기관별 최소 공제금액과 "
-            "보장대상 의료비의 20% 중 큰 금액을 공제합니다."
-        )
-        st.write(
-            "일반 비급여 통원: 3만원과 보장대상 의료비의 "
-            "30% 중 큰 금액을 공제합니다. 연간 100회 한도를 적용합니다."
-        )
-    else:
-        st.write(
-            "급여 입원: 급여 의료비의 80%를 기본 계산하고, "
-            "연간 급여 본인부담금 20%가 200만원을 초과하는 경우 "
-            "초과분을 추가 계산합니다."
-        )
-        st.write(
-            "일반 비급여 입원: 병실료를 제외한 비급여 의료비의 "
-            "70%와 상급병실료 차액 보상액을 합산합니다."
-        )
+    st.write(
+        "3대 비급여는 각각 연간 한도를 별도로 적용합니다. "
+        "도수치료·체외충격파·증식치료는 합산 연 350만원 및 50회, "
+        "비급여 주사료는 연 250만원 및 50회, "
+        "MRI·MRA는 연 300만원 한도입니다."
+    )
+
+    st.write(
+        "3대 비급여의 1회당 공제금액은 "
+        "3만원과 보장대상 의료비의 30% 중 큰 금액입니다."
+    )
+
+    st.write(
+        "도수치료 등은 최초 10회 이후 증상 개선이나 "
+        "병변 호전이 확인된 경우 추가 보상을 적용하도록 "
+        "단순화했습니다."
+    )
 
     st.caption(
-        "본 계산기는 일반 급여·비급여의 단순화된 예상 계산 모델입니다. "
-        "3대 비급여 특약, 보상 제외 항목, 실제 계약별 가입금액, "
-        "누적 지급액 및 세부 약관 조건은 별도 확인이 필요합니다."
+        "본 계산기는 업로드된 2021년 약관을 기준으로 만든 "
+        "포트폴리오용 단순화 모델입니다. 실제 지급 여부는 "
+        "가입증권, 특약 가입 여부, 보상 제외 사유, 누적 지급액, "
+        "치료 인정 기준 및 보험사 심사에 따라 달라질 수 있습니다."
     )
