@@ -2,28 +2,23 @@
 import streamlit as st
 
 st.set_page_config(
-    page_title="KB 실손보험 계산기",
+    page_title="KB 실손보험 AI 계산기",
     page_icon="🏥",
     layout="centered"
 )
 
 st.title("🏥 KB 실손보험 보험금 계산기")
-st.write("의료비 정보를 입력하면 예상 보험금을 계산합니다.")
+st.caption("4세대 실손보험 · 보험금 예상 계산 MVP")
 
 st.info(
     "본 서비스는 포트폴리오용 예상 계산 서비스입니다. "
-    "실제 지급 여부와 금액은 보험사의 심사에 따라 달라집니다."
+    "실제 보험금 지급 여부와 금액은 보험사의 심사 결과에 따라 달라집니다."
 )
 
-st.divider()
+st.header("1. 보험 및 진료 정보")
 
-st.header("1. 보험 정보")
 st.selectbox("보험사", ["KB손해보험"])
 st.selectbox("실손보험 세대", ["4세대"])
-
-st.divider()
-
-st.header("2. 진료 정보")
 
 treatment_type = st.radio(
     "진료 유형", ["통원", "입원"], horizontal=True
@@ -34,7 +29,12 @@ coverage_type = st.radio(
 )
 
 st.divider()
-st.header("3. 의료비 입력")
+st.header("2. 의료비 입력")
+
+st.caption(
+    "아래에는 총 병원비가 아닌 약관상 보장대상에 해당하는 "
+    "환자 부담 의료비를 입력하세요."
+)
 
 if treatment_type == "통원":
 
@@ -121,9 +121,14 @@ else:
         )
 
 st.divider()
-st.header("4. 예상 보험금 확인")
+st.header("3. 보험금 계산 결과")
 
-if st.button("보험금 계산하기", use_container_width=True):
+if st.button("예상 보험금 계산하기", use_container_width=True):
+
+    result = 0
+    details = []
+    formula = ""
+    coverage_name = coverage_type
 
     if treatment_type == "통원" and coverage_type == "급여":
 
@@ -137,40 +142,42 @@ if st.button("보험금 계산하기", use_container_width=True):
             int(medical_cost * 0.20)
         )
 
-        estimated_benefit = min(
-            max(0, medical_cost - deductible),
-            coverage_limit
-        )
+        before_limit = max(0, medical_cost - deductible)
+        result = min(before_limit, coverage_limit)
 
-        st.subheader("예상 보험금 결과")
-        st.metric("예상 보험금", f"{estimated_benefit:,}원")
-        st.write(f"보장대상 의료비: {medical_cost:,}원")
-        st.write(f"적용 공제금액: {deductible:,}원")
-        st.write(f"가입한 보장한도: {coverage_limit:,}원")
+        details = [
+            f"보장대상 의료비: {medical_cost:,}원",
+            f"적용 공제금액: {deductible:,}원",
+            f"한도 적용 전 보험금: {before_limit:,}원",
+            f"통원 1회 보장한도: {coverage_limit:,}원"
+        ]
+
+        formula = (
+            f"{medical_cost:,}원 - {deductible:,}원 "
+            f"= {before_limit:,}원"
+        )
 
     elif treatment_type == "통원" and coverage_type == "비급여":
 
-        deductible = max(
-            30000, int(medical_cost * 0.30)
-        )
+        deductible = max(30000, int(medical_cost * 0.30))
+        before_limit = max(0, medical_cost - deductible)
 
-        benefit_before_limit = max(
-            0, medical_cost - deductible
-        )
-
-        estimated_benefit = (
+        result = (
             0 if previous_visits >= 100
-            else benefit_before_limit
+            else before_limit
         )
 
-        st.subheader("예상 보험금 결과")
-        st.metric("예상 보험금", f"{estimated_benefit:,}원")
-        st.write(f"비급여 의료비: {medical_cost:,}원")
-        st.write(f"적용 공제금액: {deductible:,}원")
-        st.write(f"기존 사용 횟수: {previous_visits}회")
+        details = [
+            f"보장대상 비급여 의료비: {medical_cost:,}원",
+            f"적용 공제금액: {deductible:,}원",
+            f"기존 사용 횟수: {previous_visits}회",
+            "연간 통원 한도: 100회"
+        ]
 
-        if previous_visits >= 100:
-            st.warning("연간 비급여 통원 100회 한도를 모두 사용했습니다.")
+        formula = (
+            f"{medical_cost:,}원 - {deductible:,}원 "
+            f"= {before_limit:,}원"
+        )
 
     elif treatment_type == "입원" and coverage_type == "급여":
 
@@ -184,63 +191,116 @@ if st.button("보험금 계산하기", use_container_width=True):
         )
 
         current_excess = max(
-            0, previous_copay + current_copay - annual_copay_limit
+            0, previous_copay + current_copay
+            - annual_copay_limit
         )
 
         additional_benefit = current_excess - previous_excess
 
         total_benefit = basic_benefit + additional_benefit
 
-        estimated_benefit = min(
+        result = min(
             int(total_benefit), remaining_limit
         )
 
-        st.subheader("예상 보험금 결과")
-        st.metric("예상 보험금", f"{estimated_benefit:,}원")
-        st.write(f"보장 유형: {insurance_type}")
-        st.write(f"기본 보상금액: {int(basic_benefit):,}원")
-        st.write(f"추가 보상금액: {int(additional_benefit):,}원")
-        st.write(f"남은 연간 보장한도: {remaining_limit:,}원")
+        details = [
+            f"보장 유형: {insurance_type}",
+            f"급여 입원 의료비: {medical_cost:,}원",
+            f"기본 보상금액 (80%): {int(basic_benefit):,}원",
+            f"추가 보상금액: {int(additional_benefit):,}원",
+            f"남은 연간 보장한도: {remaining_limit:,}원"
+        ]
+
+        formula = (
+            f"{int(basic_benefit):,}원 + "
+            f"{int(additional_benefit):,}원 "
+            f"= {int(total_benefit):,}원"
+        )
 
     elif treatment_type == "입원" and coverage_type == "비급여":
 
-        # 일반 비급여 입원 의료비의 70% 보상
         basic_benefit = int(medical_cost * 0.70)
 
-        # 상급병실료 차액은 1일 평균 10만원 한도,
-        # 해당 한도 내 금액의 50% 보상
         daily_room_cost = room_cost / hospital_days
 
-        eligible_room_cost = min(
-            daily_room_cost, 100000
-        ) * hospital_days
-
-        room_benefit = int(
-            eligible_room_cost * 0.50
+        eligible_room_cost = (
+            min(daily_room_cost, 100000) * hospital_days
         )
 
-        total_benefit = (
-            basic_benefit + room_benefit
+        room_benefit = int(eligible_room_cost * 0.50)
+
+        total_benefit = basic_benefit + room_benefit
+
+        result = min(total_benefit, remaining_limit)
+
+        details = [
+            f"보장 유형: {insurance_type}",
+            f"일반 비급여 의료비: {medical_cost:,}원",
+            f"일반 비급여 보상액 (70%): {basic_benefit:,}원",
+            f"상급병실료 차액: {room_cost:,}원",
+            f"1일 평균 상급병실료: {daily_room_cost:,.0f}원",
+            f"상급병실료 보상액 (50%): {room_benefit:,}원",
+            f"남은 연간 보장한도: {remaining_limit:,}원"
+        ]
+
+        formula = (
+            f"{basic_benefit:,}원 + {room_benefit:,}원 "
+            f"= {total_benefit:,}원"
         )
 
-        estimated_benefit = min(
-            total_benefit, remaining_limit
+    st.success("보험금 계산이 완료되었습니다.")
+
+    st.subheader("예상 보험금")
+
+    st.metric(
+        label="예상 지급 보험금",
+        value=f"{result:,}원"
+    )
+
+    st.divider()
+    st.subheader("입력 정보 요약")
+
+    st.write(f"**진료 유형:** {treatment_type}")
+    st.write(f"**의료비 구분:** {coverage_name}")
+
+    st.divider()
+    st.subheader("계산 상세 내역")
+
+    for item in details:
+        st.write(f"- {item}")
+
+    st.markdown("**계산식**")
+    st.code(formula)
+
+    st.divider()
+    st.subheader("약관 적용 기준")
+
+    if treatment_type == "통원" and coverage_type == "급여":
+        st.write(
+            "급여 통원: 의료기관 유형에 따른 최소 공제금액과 "
+            "보장대상 의료비의 20% 중 큰 금액을 공제하는 방식"
         )
 
-        st.subheader("예상 보험금 결과")
-        st.metric("예상 보험금", f"{estimated_benefit:,}원")
-
-        st.write(f"보장 유형: {insurance_type}")
-        st.write(f"일반 비급여 입원 의료비: {medical_cost:,}원")
-        st.write(f"일반 비급여 보상액 (70%): {basic_benefit:,}원")
-        st.write(f"상급병실료 차액 총액: {room_cost:,}원")
-        st.write(f"입원 일수: {hospital_days}일")
-        st.write(f"1일 평균 상급병실료: {daily_room_cost:,.0f}원")
-        st.write(f"상급병실료 보상액 (50%): {room_benefit:,}원")
-        st.write(f"남은 연간 보장한도: {remaining_limit:,}원")
-
-        st.caption(
-            "약관상 일반 비급여 입원과 상급병실료 차액을 "
-            "분리한 단순화 계산입니다. 실제 계약의 연간 한도, "
-            "보장 제외 항목 및 기타 지급 조건을 확인해야 합니다."
+    elif treatment_type == "통원" and coverage_type == "비급여":
+        st.write(
+            "비급여 통원: 3만원과 보장대상 의료비의 30% 중 "
+            "큰 금액을 공제하고 연간 통원 횟수 한도를 적용하는 방식"
         )
+
+    elif treatment_type == "입원" and coverage_type == "급여":
+        st.write(
+            "급여 입원: 보장대상 의료비의 80%를 기본 계산하고 "
+            "연간 본인부담금 기준 추가 보상 계산을 반영한 방식"
+        )
+
+    else:
+        st.write(
+            "비급여 입원: 일반 비급여 의료비 70%와 "
+            "상급병실료 차액 보상 기준을 분리해 계산하는 방식"
+        )
+
+    st.caption(
+        "주의: 현재 계산은 MVP용 단순화 모델입니다. "
+        "실제 계약의 가입금액, 연간 누적액, 보장 제외 항목, "
+        "특약 및 약관상 세부 조건에 따라 결과가 달라질 수 있습니다."
+    )
